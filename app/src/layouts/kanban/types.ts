@@ -6,6 +6,7 @@ export type LayoutOptions = {
 	imageSource?: string;
 	title?: string;
 	text?: string;
+	user?: string;
 	crop: boolean;
 };
 
@@ -33,6 +34,7 @@ export type Item = {
 	dateType?: string;
 	tags?: string;
 	item: Record<string, any>;
+	user?: string;
 };
 
 export type ChangeEvent<T> = {

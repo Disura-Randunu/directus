@@ -53,6 +53,7 @@
 								:value="element.tags"
 								:type="Array.isArray(element.tags) ? 'csv' : 'json'"
 							/>
+							<!-- <v-avatar  /> -->
 							<display-datetime v-if="element.date" format="short" :value="element.date" :type="element.dateType" />
 						</router-link>
 					</template>
@@ -106,6 +107,10 @@ export default defineComponent({
 			default: null,
 		},
 		sortField: {
+			type: String,
+			default: null,
+		},
+		userField: {
 			type: String,
 			default: null,
 		},

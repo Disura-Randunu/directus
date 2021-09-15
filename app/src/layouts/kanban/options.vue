@@ -1,7 +1,7 @@
 <template>
 	<div class="field">
 		<div class="type-label">{{ t('layouts.kanban.group_field') }}</div>
-		<v-select v-model="groupFieldSync" show-deselect item-value="field" item-text="name" :items="groupFields" />
+		<v-select v-model="groupFieldSync" show-deselect item-value="field" item-text="name" :items="fieldGroups.group" />
 	</div>
 
 	<div class="field">
@@ -11,7 +11,7 @@
 
 	<div class="field">
 		<div class="type-label">{{ t('layouts.kanban.image_source') }}</div>
-		<v-select v-model="imageSourceSync" show-deselect item-value="field" item-text="name" :items="fileFields" />
+		<v-select v-model="imageSourceSync" show-deselect item-value="field" item-text="name" :items="fieldGroups.file" />
 	</div>
 
 	<div class="field">
@@ -21,17 +21,22 @@
 
 	<div class="field">
 		<div class="type-label">{{ t('layouts.kanban.text') }}</div>
-		<v-select v-model="textSync" :items="textFields" item-value="field" item-text="name" show-deselect />
+		<v-select v-model="textSync" :items="fieldGroups.text" item-value="field" item-text="name" show-deselect />
 	</div>
 
 	<div class="field">
 		<div class="type-label">{{ t('layouts.kanban.date') }}</div>
-		<v-select v-model="dateFieldSync" :items="dateFields" item-value="field" item-text="name" show-deselect />
+		<v-select v-model="dateFieldSync" :items="fieldGroups.date" item-value="field" item-text="name" show-deselect />
 	</div>
 
 	<div class="field">
 		<div class="type-label">{{ t('layouts.kanban.tags') }}</div>
-		<v-select v-model="tagsFieldSync" :items="tagsFields" item-value="field" item-text="name" show-deselect />
+		<v-select v-model="tagsFieldSync" :items="fieldGroups.tags" item-value="field" item-text="name" show-deselect />
+	</div>
+
+	<div class="field">
+		<div class="type-label">{{ t('layouts.kanban.user') }}</div>
+		<v-select v-model="userFieldSync" :items="fieldGroups.user" item-value="field" item-text="name" show-deselect />
 	</div>
 
 	<v-detail class="field">
@@ -60,29 +65,13 @@ export default defineComponent({
 			type: String,
 			required: true,
 		},
-		fileFields: {
-			type: Array as PropType<Field[]>,
-			required: true,
-		},
-		textFields: {
-			type: Array as PropType<Field[]>,
-			required: true,
-		},
-		groupFields: {
-			type: Array as PropType<Field[]>,
+		fieldGroups: {
+			type: Object as PropType<Record<string, Field[]>>,
 			required: true,
 		},
 		groupTitleFields: {
 			type: Array as PropType<Field[]>,
-			required: true,
-		},
-		dateFields: {
-			type: Array as PropType<Field[]>,
-			required: true,
-		},
-		tagsFields: {
-			type: Array as PropType<Field[]>,
-			required: true,
+			default: () => [],
 		},
 		groupField: {
 			type: String,
@@ -116,6 +105,10 @@ export default defineComponent({
 			type: String,
 			default: null,
 		},
+		userField: {
+			type: String,
+			default: null,
+		},
 	},
 	emits: [
 		'update:imageSource',
@@ -126,6 +119,7 @@ export default defineComponent({
 		'update:groupTitle',
 		'update:dateField',
 		'update:tagsField',
+		'update:userField',
 	],
 	setup(props, { emit }) {
 		const { t } = useI18n();
@@ -138,6 +132,7 @@ export default defineComponent({
 		const groupTitleSync = useSync(props, 'groupTitle', emit);
 		const dateFieldSync = useSync(props, 'dateField', emit);
 		const tagsFieldSync = useSync(props, 'tagsField', emit);
+		const userFieldSync = useSync(props, 'userField', emit);
 
 		return {
 			t,
@@ -149,6 +144,7 @@ export default defineComponent({
 			groupTitleSync,
 			dateFieldSync,
 			tagsFieldSync,
+			userFieldSync,
 		};
 	},
 });

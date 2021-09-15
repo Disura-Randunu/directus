@@ -15,6 +15,7 @@ import { getRelationType } from '@/utils/get-relation-type';
 import { useGroups } from './useGroups';
 import api, { addTokenToURL } from '@/api';
 import { getRootPath } from '@/utils/get-root-path';
+import { filterFields } from '@/utils/filter-fields';
 
 export default defineLayout<LayoutOptions, LayoutQuery>({
 	id: 'kanban',
@@ -38,29 +39,18 @@ export default defineLayout<LayoutOptions, LayoutQuery>({
 		const { sort, limit, page, fields } = useLayoutQuery();
 		const { info, primaryKeyField, fields: fieldsInCollection, sortField } = useCollection(collection);
 
-		const textFields = computed(() => {
-			return fieldsInCollection.value.filter((field) => field.type === 'string' || field.type === 'text');
-		});
-
-		const tagsFields = computed(() => {
-			return fieldsInCollection.value.filter((field) => field.type === 'json' || field.type === 'csv');
-		});
-
-		const dateFields = computed(() => {
-			return fieldsInCollection.value.filter((field) => ['date', 'time', 'dateTime', 'timestamp'].includes(field.type));
-		});
-
-		const groupFields = computed(() => {
-			return fieldsInCollection.value.filter((field) => {
+		const { fieldGroups } = filterFields(fieldsInCollection, {
+			text: (field) => field.type === 'string' || field.type === 'text',
+			tags: (field) => field.type === 'json' || field.type === 'csv',
+			date: (field) => ['date', 'time', 'dateTime', 'timestamp'].includes(field.type),
+			user: (field) => field.type === 'uuid',
+			group: (field) => {
 				const relation = relationsStore.relations.find(
 					(relation) => getRelationType({ relation, collection: collection.value, field: field.field }) === 'm2o'
 				);
 				return !!relation;
-			});
-		});
-
-		const fileFields = computed(() => {
-			return fieldsInCollection.value.filter((field) => {
+			},
+			file: (field) => {
 				if (field.field === '$thumbnail') return true;
 
 				const relation = relationsStore.relations.find((relation) => {
@@ -72,10 +62,11 @@ export default defineLayout<LayoutOptions, LayoutQuery>({
 				});
 
 				return !!relation;
-			});
+			},
 		});
 
-		const { groupField, groupTitle, imageSource, title, text, crop, dateField, tagsField } = useLayoutOptions();
+		const { groupField, groupTitle, imageSource, title, textField, crop, dateField, tagsField, userField } =
+			useLayoutOptions();
 		const {
 			items: groups,
 			groupTitleFields,
@@ -112,12 +103,13 @@ export default defineLayout<LayoutOptions, LayoutQuery>({
 					itemGroups[item[group]].items.push({
 						id: item[pkField],
 						title: title.value ?? undefined,
-						text: text.value ? item[text.value] : undefined,
+						text: textField.value ? item[textField.value] : undefined,
 						image: imageSource.value ? parseUrl(item[imageSource.value]) : undefined,
 						date: dateField.value ? item[dateField.value] : undefined,
-						dateType: dateFields.value.find((field) => field.field === dateField.value)?.type,
+						dateType: fieldGroups.value.date.find((field) => field.field === dateField.value)?.type,
 						tags: tagsField.value ? item[tagsField.value] : undefined,
 						sort: index,
+						user: userField.value ? item[userField.value] : undefined,
 						item,
 					});
 			});
@@ -129,14 +121,12 @@ export default defineLayout<LayoutOptions, LayoutQuery>({
 			groupedItems,
 			groupPrimaryKeyField,
 			groups,
-			fileFields,
-			groupFields,
 			groupTitle,
 			groupTitleFields,
 			groupField,
 			imageSource,
 			title,
-			text,
+			textField,
 			crop,
 			items,
 			loading,
@@ -152,14 +142,13 @@ export default defineLayout<LayoutOptions, LayoutQuery>({
 			info,
 			sortField,
 			changeManualSort,
-			textFields,
 			dateField,
-			dateFields,
 			tagsField,
-			tagsFields,
 			change,
 			changeGroups,
 			groupSortField,
+			fieldGroups,
+			userField,
 		};
 
 		async function change(group: Group, event: ChangeEvent<Item>) {
@@ -210,16 +199,17 @@ export default defineLayout<LayoutOptions, LayoutQuery>({
 		}
 
 		function useLayoutOptions() {
-			const groupField = createViewOption<string | null>('groupField', groupFields.value[0]?.field ?? null);
+			const groupField = createViewOption<string | null>('groupField', fieldGroups.value.group[0]?.field ?? null);
 			const groupTitle = createViewOption<string | null>('groupTitle', null);
-			const dateField = createViewOption<string | null>('dateField', dateFields.value[0]?.field ?? null);
-			const tagsField = createViewOption<string | null>('tagsField', tagsFields.value[0]?.field ?? null);
+			const dateField = createViewOption<string | null>('dateField', fieldGroups.value.date[0]?.field ?? null);
+			const tagsField = createViewOption<string | null>('tagsField', fieldGroups.value.tags[0]?.field ?? null);
+			const userField = createViewOption<string | null>('tagsField', fieldGroups.value.user[0]?.field ?? null);
+			const textField = createViewOption<string | null>('text', fieldGroups.value.text[0]?.field ?? null);
 			const title = createViewOption<string | null>('title', null);
-			const text = createViewOption<string | null>('text', null);
-			const imageSource = createViewOption<string | null>('imageSource', fileFields.value[0]?.field ?? null);
+			const imageSource = createViewOption<string | null>('imageSource', fieldGroups.value.file[0]?.field ?? null);
 			const crop = createViewOption<boolean>('crop', true);
 
-			return { groupField, groupTitle, imageSource, title, text, crop, dateField, tagsField };
+			return { groupField, groupTitle, imageSource, title, textField, crop, dateField, tagsField, userField };
 
 			function createViewOption<T>(key: keyof LayoutOptions, defaultValue: any) {
 				return computed<T>({
@@ -276,6 +266,10 @@ export default defineLayout<LayoutOptions, LayoutQuery>({
 					fields.push(`${imageSource.value}.id`);
 				}
 
+				if (userField.value) {
+					fields.push(`${userField.value}.*`);
+				}
+
 				if (props.collection === 'directus_files' && imageSource.value === '$thumbnail') {
 					fields.push('modified_on');
 					fields.push('type');
@@ -289,7 +283,7 @@ export default defineLayout<LayoutOptions, LayoutQuery>({
 					}
 				}
 
-				[groupField.value, text.value, tagsField.value, dateField.value].forEach((val) => {
+				[groupField.value, textField.value, tagsField.value, dateField.value].forEach((val) => {
 					if (val !== null) fields.push(val);
 				});
 
