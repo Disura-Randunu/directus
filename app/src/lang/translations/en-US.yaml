@@ -1428,6 +1428,6 @@ layouts:
     title: Title
     text: Text
     crop: Crop
-    image_fit: Image Fit,
+    image_fit: Image Fit
     date: Date
     tags: Tags

@@ -4,17 +4,14 @@ import KanbanOptions from './options.vue';
 import KanbanSidebar from './sidebar.vue';
 import KanbanActions from './actions.vue';
 
-import { useI18n } from 'vue-i18n';
 import { ChangeEvent, Group, Item, LayoutOptions, LayoutQuery } from './types';
 import useSync from '@/composables/use-sync';
 import useCollection from '@/composables/use-collection';
 import useItems from '@/composables/use-items';
-import { ref, computed, toRefs } from 'vue';
-import { useFieldsStore, useRelationsStore } from '@/stores';
+import { computed, toRefs } from 'vue';
+import { useRelationsStore } from '@/stores';
 import { getFieldsFromTemplate } from '@/utils/get-fields-from-template';
-import adjustFieldsForDisplays from '@/utils/adjust-fields-for-displays';
 import { getRelationType } from '@/utils/get-relation-type';
-import { Filter } from '@directus/shared/types';
 import { useGroups } from './useGroups';
 import api, { addTokenToURL } from '@/api';
 import { getRootPath } from '@/utils/get-root-path';
@@ -30,13 +27,8 @@ export default defineLayout<LayoutOptions, LayoutQuery>({
 		actions: KanbanActions,
 	},
 	setup(props, { emit }) {
-		const { t, n } = useI18n();
-
 		const relationsStore = useRelationsStore();
-		const fieldsStore = useFieldsStore();
-		const loadingSort = ref(false);
 
-		const selection = useSync(props, 'selection', emit);
 		const layoutOptions = useSync(props, 'layoutOptions', emit);
 		const layoutQuery = useSync(props, 'layoutQuery', emit);
 		const filters = useSync(props, 'filters', emit);
@@ -88,19 +80,18 @@ export default defineLayout<LayoutOptions, LayoutQuery>({
 			items: groups,
 			groupTitleFields,
 			primaryKeyField: groupPrimaryKeyField,
+			changeGroups,
+			sortField: groupSortField,
 		} = useGroups(collection, groupField, groupTitle);
 
-		const { items, loading, error, totalPages, itemCount, totalCount, changeManualSort, getItems } = useItems(
-			collection,
-			{
-				sort,
-				limit,
-				page,
-				fields,
-				filters: filters,
-				searchQuery: searchQuery,
-			}
-		);
+		const { items, loading, error, totalPages, itemCount, totalCount, changeManualSort } = useItems(collection, {
+			sort,
+			limit,
+			page,
+			fields,
+			filters: filters,
+			searchQuery: searchQuery,
+		});
 
 		const groupedItems = computed<Group[]>(() => {
 			const gpkField = groupPrimaryKeyField.value?.field;
@@ -111,10 +102,10 @@ export default defineLayout<LayoutOptions, LayoutQuery>({
 
 			if (pkField === undefined || gpkField === undefined || titleField === null || group === null) return [];
 
-			const itemGroups: Record<string | number, Group> = groups.value.reduce((acc, group) => {
-				acc[group[gpkField]] = { id: group[gpkField], title: group[titleField], items: [] };
-				return acc;
-			}, {} as Record<string, any>);
+			const itemGroups: Record<string | number, Group> = {};
+			groups.value.forEach((group, index) => {
+				itemGroups[group[gpkField]] = { id: group[gpkField], title: group[titleField], items: [], sort: index };
+			});
 
 			items.value.forEach((item, index) => {
 				if (item[group] in itemGroups)
@@ -131,7 +122,7 @@ export default defineLayout<LayoutOptions, LayoutQuery>({
 					});
 			});
 
-			return Object.values(itemGroups);
+			return Object.values(itemGroups).sort((a, b) => a.sort - b.sort);
 		});
 
 		return {
@@ -167,16 +158,15 @@ export default defineLayout<LayoutOptions, LayoutQuery>({
 			tagsField,
 			tagsFields,
 			change,
-			loadingSort,
+			changeGroups,
+			groupSortField,
 		};
 
-		async function change(group: Group, event: ChangeEvent) {
+		async function change(group: Group, event: ChangeEvent<Item>) {
 			const gField = groupField.value;
 			const pkField = primaryKeyField.value?.field;
 
 			if (gField === null || pkField === undefined || event.removed) return;
-
-			loadingSort.value = true;
 
 			if (event.moved) {
 				await changeManualSort({
@@ -206,8 +196,6 @@ export default defineLayout<LayoutOptions, LayoutQuery>({
 					[gField]: group.id,
 				});
 			}
-
-			loadingSort.value = false;
 		}
 
 		function parseUrl(file: Record<string, any>) {
@@ -311,7 +299,7 @@ export default defineLayout<LayoutOptions, LayoutQuery>({
 					titleSubtitleFields.push(...getFieldsFromTemplate(title.value));
 				}
 
-				return [...fields, ...adjustFieldsForDisplays(titleSubtitleFields, props.collection)];
+				return [...fields, ...titleSubtitleFields];
 			});
 
 			return { sort, limit, page, fields };
